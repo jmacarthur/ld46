@@ -88,10 +88,12 @@ function makeTitleBitmaps()
     titleBitmap.width = SCREENWIDTH;
     titleBitmap.height = SCREENHEIGHT;
     titlectx = titleBitmap.getContext('2d');
+    titlectx.imageSmoothingEnabled = false;
     winBitmap = document.createElement('canvas');
     winBitmap.width = SCREENWIDTH;
     winBitmap.height = SCREENHEIGHT;
     winctx = winBitmap.getContext('2d');
+    winctx.imageSmoothingEnabled = false;
     bitfont = new Image();
     bitfont.src = "graphics/bitfont.png";
     bitfont.onload = paintTitleBitmaps;
@@ -122,10 +124,13 @@ function resetGame()
 function init()
 {
     mode = MODE_TITLE;
+    ctx.imageSmoothingEnabled = false;
+
     playerImage = getImage("player");
-    blockImage = getImage("block");
+    blockImage = getImage("block_w_n");
     springSound = new Audio("audio/boing.wav");
     makeTitleBitmaps();
+
     return true;
 }
 
