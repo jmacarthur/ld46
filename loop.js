@@ -102,6 +102,7 @@ function resetGame()
     x = 128;
     y = 128;
     blocks = Array();
+    particles = Array();
     for(var i=0;i<100;i++) {
 	blockx = Math.random() * SCREENWIDTH;
 	blocky = Math.random() * SCREENHEIGHT;
@@ -142,10 +143,25 @@ function draw() {
 	ctx.drawImage(blockImage, blocks[i].x, blocks[i].y);
 	if(blocks[i].fixed) { drawString(ctx, i.toString(), blocks[i].x, blocks[i].y); }
     }
-
+    for(var i=0;i<particles.length; i++) {
+	ctx.fillStyle = "#ffffff";
+	ctx.fillRect(particles[i].x, particles[i].y, 2, 2);
+    }
     if(mode == MODE_WIN) {
 	ctx.drawImage(winBitmap, 0, 0);
     }
+}
+
+function gameLoop() {
+    particles.push({x: Math.random() * SCREENWIDTH, y: 0});
+    var new_particles = new Array();
+    for(var i=0;i<particles.length;i++) {
+	particles[i].y += 1;
+	if(particles[i].y < SCREENHEIGHT) {
+	    new_particles.push(particles[i]);
+	}
+    }
+    particles = new_particles;
 }
 
 function processKeys() {
@@ -198,6 +214,7 @@ function processKeys() {
 
 function drawRepeat() {
     if(mode != MODE_TITLE) {
+	gameLoop();
 	processKeys();
     }
     draw();
