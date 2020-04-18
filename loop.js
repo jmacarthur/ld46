@@ -15,7 +15,7 @@ function getImage(name)
     return image;
 }
 
-function drawChar(context, c, x, y) 
+function drawChar(context, c, x, y)
 {
     c = c.charCodeAt(0);
     if(c > 0) {
@@ -29,6 +29,10 @@ function drawString(context, string, x, y) {
 	drawChar(context, string[i], x, y);
 	x += 12;
     }
+}
+
+function block_overlaps(x1, y1, x2, y2) {
+    return (x1 + blockImage.width >= x2 && x1 < x2+blockImage.width && y1 + blockImage.height >= y2 && y1 < y2+blockImage.height);
 }
 
 function paintTitleBitmaps()
@@ -57,8 +61,18 @@ function resetGame()
     x = 128;
     y = 128;
     blocks = Array();
-    for(var i=0;i<10;i++) {
-	blocks[i] = { x: Math.random() * SCREENWIDTH, y: Math.random() * SCREENHEIGHT };
+    for(var i=0;i<100;i++) {
+	blockx = Math.random() * SCREENWIDTH;
+	blocky = Math.random() * SCREENHEIGHT;
+	overlaps = false;
+	for (var j=0;j<blocks.length;j++) {
+	    if(block_overlaps(blocks[j].x, blocks[j].y, blockx, blocky)) {
+		overlaps = true;
+	    }
+	}
+	if (!overlaps) {
+	    blocks.push({ x: blockx, y: blocky});
+	}
     }
 }
 
