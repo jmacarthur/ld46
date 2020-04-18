@@ -39,6 +39,16 @@ function overlaps(x1, y1, sprite1, x2, y2, sprite2) {
     return (x1 + sprite1.width >= x2 && x1 < x2+sprite2.width && y1 + sprite1.height >= y2 && y1 < y2+sprite2.height);
 }
 
+function find_block(x, y) {
+    // Find a block which a single pixel is inside, and return its index or -1 if none
+    for(var i=0;i<blocks.length;i++) {
+	if (x >= blocks[i].x && x < blocks[i].x+blockImage.width && y >= blocks[i].y && y < blocks[i].y+blockImage.height) {
+	    return i;
+	}
+    }
+    return -1;
+}
+
 function touching_block(x1, y1, sprite1, chain) {
     // Returns the list of blocks touching one sprite at x1, y1, apart from those in 'chain'.
     var touching = new Array();
@@ -57,7 +67,6 @@ function touching_block(x1, y1, sprite1, chain) {
 function push_chain_x(x, y, dx, sprite1, chain) {
     var t = touching_block(x+dx, y, sprite1, chain);
     if(t.length > 0) {
-	console.log("Chain " + chain + " touching blocks "+t);
 	for(var i=0;i<t.length;i++) { chain.push(t[i]); }
 	for(var i=0;i<t.length;i++) {
 	    push_chain_x(blocks[t[i]].x, blocks[t[i]].y, dx, blockImage, chain);
@@ -68,7 +77,6 @@ function push_chain_x(x, y, dx, sprite1, chain) {
 function push_chain_y(x, y, dy, sprite1, chain) {
     var t = touching_block(x, y+dy, sprite1, chain);
     if(t.length > 0) {
-	console.log("Chain " + chain + " touching blocks "+t);
 	for(var i=0;i<t.length;i++) { chain.push(t[i]); }
 	for(var i=0;i<t.length;i++) {
 	    push_chain_y(blocks[t[i]].x, blocks[t[i]].y, dy, blockImage, chain);
@@ -149,8 +157,15 @@ function draw() {
 	if(blocks[i].fixed) { drawString(ctx, i.toString(), blocks[i].x, blocks[i].y); }
     }
     for(var i=0;i<particles.length; i++) {
+	var px = particles[i].x;
+	var py = particles[i].y;
+	if(particles[i].inBlock > -1) {
+	    px += blocks[particles[i].inBlock].x;
+	    py += blocks[particles[i].inBlock].y;
+	}
+	
 	ctx.fillStyle = "#ffffff";
-	ctx.fillRect(particles[i].x, particles[i].y, 2, 2);
+	ctx.fillRect(px, py, 2, 2);
     }
     if(mode == MODE_WIN) {
 	ctx.drawImage(winBitmap, 0, 0);
@@ -158,10 +173,44 @@ function draw() {
 }
 
 function gameLoop() {
-    particles.push({x: Math.random() * SCREENWIDTH, y: 0});
+    particles.push({x: Math.random() * SCREENWIDTH, y: 0, inBlock: -1, dx: 0, dy: 1, blockTravel: 0});
     var new_particles = new Array();
     for(var i=0;i<particles.length;i++) {
-	particles[i].y += 1;
+	particles[i].x += particles[i].dx;
+	particles[i].y += particles[i].dy;
+	if(particles[i].inBlock == -1) {
+	    // Not currently inside a block
+	    var b = find_block(particles[i].x, particles[i].y);
+	    if(b!==-1) {
+		// Insufficient block entry check!
+		if(particles[i].x > blocks[b].x + 12 && particles[i].x < blocks[b].x + 20) {
+		    console.log("Particle "+i+" entering block");
+		    particles[i].x -= blocks[b].x;
+		    particles[i].y -= blocks[b].y;
+		    particles[i].inBlock = b;
+		    particles[i].blockTravel = 0;
+		    particles[i].dx = 0;
+		    particles[i].dy = 1;
+		}
+		else {
+		    particles[i].y = 999;
+		}
+	    }
+	}
+	else {
+	    // Inside a block
+	    if(particles[i].blockTravel == 16) {
+		particles[i].dx = -1;
+		particles[i].dy = 0;
+	    } else if (particles[i].blockTravel >= 36) {
+		var exitBlock = particles[i].inBlock;
+		particles[i].inBlock = -1;
+		particles[i].x += blocks[exitBlock].x;
+		particles[i].y += blocks[exitBlock].y;
+		console.log("Restoring particle "+i+" to "+particles[i].x+","+particles[i].y);
+	    }
+	    particles[i].blockTravel += 1;
+	}
 	if(particles[i].y < SCREENHEIGHT) {
 	    new_particles.push(particles[i]);
 	}
@@ -194,7 +243,6 @@ function processKeys() {
     }
     if(!blocked) {
 	x += dx;
-	console.log("Push chain is "+push_chain);
 	for(var i = 0;i< push_chain.length; i++){
 	    blocks[push_chain[i]].x += dx;
 	}
