@@ -56,12 +56,17 @@ function resetGame()
 {
     x = 128;
     y = 128;
+    blocks = Array();
+    for(var i=0;i<10;i++) {
+	blocks[i] = { x: Math.random() * SCREENWIDTH, y: Math.random() * SCREENHEIGHT };
+    }
 }
 
 function init()
 {
     mode = MODE_TITLE;
     playerImage = getImage("player");
+    blockImage = getImage("block");
     springSound = new Audio("audio/boing.wav");
     makeTitleBitmaps();
     return true;
@@ -77,6 +82,9 @@ function draw() {
     }
 
     ctx.drawImage(playerImage, x, y);
+    for(var i=0;i<blocks.length; i++) {
+	ctx.drawImage(blockImage, blocks[i].x, blocks[i].y);
+    }
 
     if(mode == MODE_WIN) {
 	ctx.drawImage(winBitmap, 0, 0);
@@ -143,13 +151,12 @@ if (canvas.getContext('2d')) {
     };
 
 
-    
     body.onkeyup = function (event) {
 	var c = event.keyCode;
         keysDown[c] = 0;
     };
 
-    if(init()) {      
+    if(init()) {
       drawRepeat();
     }
 }
