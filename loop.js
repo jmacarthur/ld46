@@ -35,6 +35,10 @@ function block_overlaps(x1, y1, x2, y2) {
     return (x1 + blockImage.width >= x2 && x1 < x2+blockImage.width && y1 + blockImage.height >= y2 && y1 < y2+blockImage.height);
 }
 
+function overlaps(x1, y1, sprite1, x2, y2, sprite2) {
+    return (x1 + sprite1.width >= x2 && x1 < x2+sprite2.width && y1 + sprite1.height >= y2 && y1 < y2+sprite2.height);
+}
+
 function paintTitleBitmaps()
 {
     drawString(titlectx, 'This is a demo of the JavaScript/HTML5 game loop',32,32);
@@ -64,13 +68,13 @@ function resetGame()
     for(var i=0;i<100;i++) {
 	blockx = Math.random() * SCREENWIDTH;
 	blocky = Math.random() * SCREENHEIGHT;
-	overlaps = false;
+	var overlap = false;
 	for (var j=0;j<blocks.length;j++) {
 	    if(block_overlaps(blocks[j].x, blocks[j].y, blockx, blocky)) {
-		overlaps = true;
+		overlap = true;
 	    }
 	}
-	if (!overlaps) {
+	if (!overlap) {
 	    blocks.push({ x: blockx, y: blocky});
 	}
     }
@@ -106,14 +110,30 @@ function draw() {
 }
 
 function processKeys() {
-    if(keysDown[40] || keysDown[83]) y += 4;
-    if(keysDown[38] || keysDown[87]) y -= 4;
-    if(keysDown[37] || keysDown[65]) x -= 4;
-    if(keysDown[39] || keysDown[68]) x += 4;
-    if(x < 0) x = 0;
-    if(x > SCREENWIDTH - playerImage.width)  x = SCREENHEIGHT - playerImage.width;
-    if(y < 0) y = 0;
-    if(y > SCREENWIDTH - playerImage.height) y = SCREENHEIGHT - playerImage.height;
+    var tx = x;
+    var ty = y;
+    if(keysDown[40] || keysDown[83]) ty  = y + 4;
+    if(keysDown[38] || keysDown[87]) ty  = y - 4;
+    if(keysDown[37] || keysDown[65]) tx = x - 4;
+    if(keysDown[39] || keysDown[68]) tx = x + 4;
+    if(tx < 0) tx = 0;
+    if(tx > SCREENWIDTH - playerImage.width) tx = SCREENHEIGHT - playerImage.width;
+    if(ty < 0) ty = 0;
+    if(ty > SCREENWIDTH - playerImage.height) ty = SCREENHEIGHT - playerImage.height;
+    var overlap_x = false;
+    var overlap_y = false;
+    for(var i=0;i<blocks.length;i++) {
+	if(overlaps(tx, y, playerImage, blocks[i].x, blocks[i].y, blockImage)) {
+	    overlap_x = true;
+	}
+    }
+    if(!overlap_x) { x = tx; }
+    for(var i=0;i<blocks.length;i++) {
+	if(overlaps(x, ty, playerImage, blocks[i].x, blocks[i].y, blockImage)) {
+	    overlap_y = true;
+	}
+    }
+    if(!overlap_y) { y = ty; }
 }
 
 function drawRepeat() {
