@@ -39,6 +39,43 @@ function overlaps(x1, y1, sprite1, x2, y2, sprite2) {
     return (x1 + sprite1.width >= x2 && x1 < x2+sprite2.width && y1 + sprite1.height >= y2 && y1 < y2+sprite2.height);
 }
 
+function touching_block(x1, y1, sprite1, chain) {
+    // Returns the list of blocks touching one sprite at x1, y1, apart from those in 'chain'.
+    var touching = new Array();
+    for(var i=0;i<blocks.length;i++) {
+	if (chain.includes(i) || touching.includes(i)) {
+	    // Don't touch yourself
+	    continue;
+	}
+	if (x1 + sprite1.width > blocks[i].x && x1 < blocks[i].x+blockImage.width && y1 + sprite1.height > blocks[i].y && y1 < blocks[i].y+blockImage.height) {
+	    touching.push(i);
+	}
+    }
+    return touching;
+}
+
+function push_chain_x(x, y, dx, sprite1, chain) {
+    var t = touching_block(x+dx, y, sprite1, chain);
+    if(t.length > 0) {
+	console.log("Chain " + chain + " touching blocks "+t);
+	for(var i=0;i<t.length;i++) { chain.push(t[i]); }
+	for(var i=0;i<t.length;i++) {
+	    push_chain_x(blocks[t[i]].x, blocks[t[i]].y, dx, blockImage, chain);
+	}
+    }
+}
+
+function push_chain_y(x, y, dy, sprite1, chain) {
+    var t = touching_block(x, y+dy, sprite1, chain);
+    if(t.length > 0) {
+	console.log("Chain " + chain + " touching blocks "+t);
+	for(var i=0;i<t.length;i++) { chain.push(t[i]); }
+	for(var i=0;i<t.length;i++) {
+	    push_chain_y(blocks[t[i]].x, blocks[t[i]].y, dy, blockImage, chain);
+	}
+    }
+}
+
 function paintTitleBitmaps()
 {
     drawString(titlectx, 'This is a demo of the JavaScript/HTML5 game loop',32,32);
@@ -74,8 +111,9 @@ function resetGame()
 		overlap = true;
 	    }
 	}
+	fixed = Math.random() < 0.2? true: false;
 	if (!overlap) {
-	    blocks.push({ x: blockx, y: blocky});
+	    blocks.push({ x: blockx, y: blocky, fixed: fixed});
 	}
     }
 }
@@ -102,6 +140,7 @@ function draw() {
     ctx.drawImage(playerImage, x, y);
     for(var i=0;i<blocks.length; i++) {
 	ctx.drawImage(blockImage, blocks[i].x, blocks[i].y);
+	if(blocks[i].fixed) { drawString(ctx, i.toString(), blocks[i].x, blocks[i].y); }
     }
 
     if(mode == MODE_WIN) {
@@ -110,30 +149,51 @@ function draw() {
 }
 
 function processKeys() {
-    var tx = x;
-    var ty = y;
-    if(keysDown[40] || keysDown[83]) ty  = y + 4;
-    if(keysDown[38] || keysDown[87]) ty  = y - 4;
-    if(keysDown[37] || keysDown[65]) tx = x - 4;
-    if(keysDown[39] || keysDown[68]) tx = x + 4;
-    if(tx < 0) tx = 0;
-    if(tx > SCREENWIDTH - playerImage.width) tx = SCREENHEIGHT - playerImage.width;
-    if(ty < 0) ty = 0;
-    if(ty > SCREENWIDTH - playerImage.height) ty = SCREENHEIGHT - playerImage.height;
+    var dx = 0;
+    var dy = 0;
+    if(keysDown[40] || keysDown[83]) dy = 4;
+    if(keysDown[38] || keysDown[87]) dy = - 4;
+    if(keysDown[37] || keysDown[65]) dx = - 4;
+    if(keysDown[39] || keysDown[68]) dx = 4;
+    if(x+dx < 0) dx = 0;
+    if(x+dx > SCREENWIDTH - playerImage.width) dx = 0;
+    if(y+dy < 0) dy = 0;
+    if(y+dy > SCREENWIDTH - playerImage.height) dy = 0;
     var overlap_x = false;
     var overlap_y = false;
-    for(var i=0;i<blocks.length;i++) {
-	if(overlaps(tx, y, playerImage, blocks[i].x, blocks[i].y, blockImage)) {
-	    overlap_x = true;
+
+    var push_chain = new Array();
+    push_chain_x(x, y, dx, playerImage, push_chain);
+    blocked = false;
+    for(var i = 0;i < push_chain.length; i++) {
+	if(blocks[push_chain[i]].fixed) {
+	    blocked = true;
+	    break;
 	}
     }
-    if(!overlap_x) { x = tx; }
-    for(var i=0;i<blocks.length;i++) {
-	if(overlaps(x, ty, playerImage, blocks[i].x, blocks[i].y, blockImage)) {
-	    overlap_y = true;
+    if(!blocked) {
+	x += dx;
+	console.log("Push chain is "+push_chain);
+	for(var i = 0;i< push_chain.length; i++){
+	    blocks[push_chain[i]].x += dx;
 	}
     }
-    if(!overlap_y) { y = ty; }
+    var push_chain = new Array();
+    push_chain_y(x, y, dy, playerImage, push_chain);
+    blocked = false;
+    for(var i = 0;i < push_chain.length; i++) {
+	if(blocks[push_chain[i]].fixed) {
+	    blocked = true;
+	    break;
+	}
+    }
+    if(!blocked) {
+	y += dy;
+	console.log("Push chain is "+push_chain);
+	for(var i = 0;i< push_chain.length; i++){
+	    blocks[push_chain[i]].y += dy;
+	}
+    }
 }
 
 function drawRepeat() {
