@@ -7,6 +7,20 @@ var SCREENHEIGHT = 480;
 var MODE_TITLE = 0;
 var MODE_PLAY  = 1;
 var MODE_WIN   = 2;
+var frame = 0;
+// Block types
+var block_names = [ 'block_e_n', 'block_w_n', 'block_w_s', 'block_e_s' ];
+var block_sprites = {};
+var block_entry = { 'block_e_n': [ 1,0,1,0 ], 'block_w_n': [1,0,0,1], 'block_w_s': [0,1,0,1], 'block_e_s': [0,1,1,0] }; // NSEW
+
+class Block {
+    constructor(x, y, sprite_name, fixed) {
+	this.x = x;
+	this.y = y;
+	this.sprite_name = sprite_name;
+	this.fixed = fixed;
+    }
+}
 
 function getImage(name)
 {
@@ -111,9 +125,10 @@ function resetGame()
 {
     x = 128;
     y = 128;
+    frame = 0;
     blocks = Array();
     particles = Array();
-    for(var i=0;i<100;i++) {
+    for(var i=0;i<10;i++) {
 	blockx = Math.random() * SCREENWIDTH;
 	blocky = Math.random() * SCREENHEIGHT;
 	var overlap = false;
@@ -123,10 +138,16 @@ function resetGame()
 	    }
 	}
 	fixed = Math.random() < 0.2? true: false;
+	sprite_name = block_names[Math.floor(Math.random()*block_names.length)];
 	if (!overlap) {
-	    blocks.push({ x: blockx, y: blocky, fixed: fixed});
+	    blocks.push(new Block(blockx, blocky, sprite_name, fixed));
 	}
     }
+}
+
+function load_block_sprite(name) {
+    console.log("Loaded "+name);
+    block_sprites[name] = getImage(name);
 }
 
 function init()
@@ -135,6 +156,7 @@ function init()
     ctx.imageSmoothingEnabled = false;
 
     playerImage = getImage("player");
+    block_names.forEach(load_block_sprite);
     blockImage = getImage("block_w_n");
     springSound = new Audio("audio/boing.wav");
     makeTitleBitmaps();
@@ -153,7 +175,8 @@ function draw() {
 
     ctx.drawImage(playerImage, x, y);
     for(var i=0;i<blocks.length; i++) {
-	ctx.drawImage(blockImage, blocks[i].x, blocks[i].y);
+	var sn = blocks[i].sprite_name;
+	ctx.drawImage(block_sprites[blocks[i].sprite_name], blocks[i].x, blocks[i].y);
 	if(blocks[i].fixed) { drawString(ctx, i.toString(), blocks[i].x, blocks[i].y); }
     }
     for(var i=0;i<particles.length; i++) {
@@ -163,7 +186,7 @@ function draw() {
 	    px += blocks[particles[i].inBlock].x;
 	    py += blocks[particles[i].inBlock].y;
 	}
-	
+
 	ctx.fillStyle = "#ffffff";
 	ctx.fillRect(px, py, 2, 2);
     }
@@ -172,8 +195,65 @@ function draw() {
     }
 }
 
+function is_entering_block(particle, block) {
+    // We already know we're inside the perimeter of a block, now are we close enough to the entrace and travelling in the right direction?
+
+    // are you near the outside edge, and travelling inwards?
+    var rx = particle.x - block.x;
+    var ry = particle.y - block.y;
+    var border = 4;
+    var intake_gap = 4;
+    var N = 0; var S = 1; var E = 2; var W = 3;
+    var intake_map = block_entry[block.sprite_name];
+    if(rx <= border && ry >= blockImage.height/2 - intake_gap/2 && ry <= blockImage.height/2 + intake_gap/2 && particle.dx > 0 && intake_map[W]) {
+	return [1,0];
+    }
+    if(rx >= blockImage.width - border && ry >= blockImage.height/2 - intake_gap/2 && ry <= blockImage.height/2 + intake_gap/2 && particle.dx < 0 && intake_map[E]) {
+	return [-1,0];
+    }
+    if(ry <= border && rx >= blockImage.width/2 - intake_gap/2 && rx <= blockImage.width/2 + intake_gap/2 && particle.dy > 0 && intake_map[N]) {
+	return [0,1];
+    }
+    if(ry >= blockImage.height - border && rx >= blockImage.width/2 - intake_gap/2 && rx <= blockImage.width/2 + intake_gap/2 && particle.dy < 0 && intake_map[S]) {
+	return [0,-1];
+    }
+    return -1;
+}
+
+function divert_particle(particle) {
+    var block = blocks[particle.inBlock];
+    var intake_map = block_entry[block.sprite_name];
+    if(particle.dx != 0) {
+	particle.dx = 0;
+	if(intake_map[0] == 1) {
+	    // Going north
+	    console.log(block.sprite_name + " redirects north");
+	    particle.dy = -1;
+	} else {
+	    console.log(block.sprite_name + " redirects south");
+	    particle.dy = 1;
+	}
+	return;
+    }
+    if(particle.dy != 0) {
+	particle.dy = 0;
+	if(intake_map[2] == 1) {
+	    console.log(block.sprite_name + " redirects east");
+	    // Going east
+	    particle.dx = 1;
+	} else {
+	    console.log(block.sprite_name + " redirects west");
+	    particle.dx = -1;
+	}
+	return;
+    }
+}
+
 function gameLoop() {
-    particles.push({x: Math.random() * SCREENWIDTH, y: 0, inBlock: -1, dx: 0, dy: 1, blockTravel: 0});
+    frame += 1;
+    if(frame % 1 == 0) {
+	particles.push({x: Math.random() * SCREENWIDTH, y: 0, inBlock: -1, dx: 0, dy: 1, blockTravel: 0});
+    }
     var new_particles = new Array();
     for(var i=0;i<particles.length;i++) {
 	particles[i].x += particles[i].dx;
@@ -182,17 +262,20 @@ function gameLoop() {
 	    // Not currently inside a block
 	    var b = find_block(particles[i].x, particles[i].y);
 	    if(b!==-1) {
-		// Insufficient block entry check!
-		if(particles[i].x > blocks[b].x + 12 && particles[i].x < blocks[b].x + 20) {
-		    console.log("Particle "+i+" entering block");
+		block_enter_d = is_entering_block(particles[i], blocks[b]);
+		if(block_enter_d != -1) {
+		    console.log("Particle entering block "+blocks[b].sprite_name);
 		    particles[i].x -= blocks[b].x;
 		    particles[i].y -= blocks[b].y;
+		    if(block_enter_d[0] != 0) { particles[i].y = blockImage.height/2; }
+		    if(block_enter_d[1] != 0) { particles[i].x = blockImage.height/2; }
 		    particles[i].inBlock = b;
 		    particles[i].blockTravel = 0;
-		    particles[i].dx = 0;
-		    particles[i].dy = 1;
+		    particles[i].dx = block_enter_d[0];
+		    particles[i].dy = block_enter_d[1];
 		}
 		else {
+		    console.log("Particle blocked by block "+blocks[b].sprite_name);
 		    particles[i].y = 999;
 		}
 	    }
@@ -200,8 +283,7 @@ function gameLoop() {
 	else {
 	    // Inside a block
 	    if(particles[i].blockTravel == 16) {
-		particles[i].dx = -1;
-		particles[i].dy = 0;
+		divert_particle(particles[i]);
 	    } else if (particles[i].blockTravel >= 36) {
 		var exitBlock = particles[i].inBlock;
 		particles[i].inBlock = -1;
@@ -258,7 +340,6 @@ function processKeys() {
     }
     if(!blocked) {
 	y += dy;
-	console.log("Push chain is "+push_chain);
 	for(var i = 0;i< push_chain.length; i++){
 	    blocks[push_chain[i]].y += dy;
 	}
